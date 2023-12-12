@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import ExtentSerializer, PolygonSerializer, GeometrySerializer
-from arcgis.geometry import Geometry, SpatialReference
+# from arcgis.geometry import Geometry, SpatialReference
 
 class CalculateAreaView(APIView):
     def post(self, request, *args, **kwargs):
@@ -20,40 +20,20 @@ class CalculateAreaView(APIView):
                         xmax = extent_serializer.validated_data['xmax']
                         ymin = extent_serializer.validated_data['ymin']
                         ymax = extent_serializer.validated_data['ymax']
-                        srs = extent_serializer.validated_data['srs']
+                        x_coords = [xmin, xmin, xmax, xmax]
+                        y_coords = [ymin, ymax, ymax, ymin]
                         
-                        spatial_reference = SpatialReference(wkid=srs)
-                        extent_geometry = Geometry({
-                            "rings": [
-                                [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin], [xmin, ymin]]
-                            ],
-                            "spatialReference": spatial_reference
-                        })
-                        area = extent_geometry.area
-                        areas.append(area)
-                elif 'rings' in item:
-                    # If polygon coordinates are provided
-                    polygon_serializer = PolygonSerializer(data=item)
-                    if polygon_serializer.is_valid():
-                        coordinates = polygon_serializer.validated_data['rings']
-                        srs = polygon_serializer.validated_data['srs']
+                        area = 0
 
-                        polygon_geometry = Geometry({
-                            "rings": coordinates,
-                            "spatialReference": {"wkid": srs}
-                        })
-                        area = polygon_geometry.area
+                        # Use Shoelace formula to calculate the area
+                        for i in range(4):
+                            j = (i + 1) % 4
+                            area += x_coords[i] * y_coords[j]
+                            area -= x_coords[j] * y_coords[i]
+
+                        area = abs(area) / 2
                         areas.append(area)
-            
-            # Convert areas to specified unit
-            # converted_areas = []
-            # for area in areas:
-            #     converted_area = self.convert_area(area, area_unit)
-            #     converted_areas.append(converted_area)
-            
-            # return Response({'areas': converted_areas})
             return Response({'areas': areas})
         return Response(serializer.errors, status=400)
 
-    def convert_area(self, area, target_unit):
-        pass
+
